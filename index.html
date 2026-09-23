@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>STIR: Steerability-Informed Replanning for Reactive Goal Switching</title>
+  <meta name="description" content="STIR: Steerability-Informed Replanning for Reactive Goal Switching. Project page for an anonymous submission.">
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-N6HZ5RBZ8M"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-N6HZ5RBZ8M');
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="static/css/style.css">
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap">
+    <h1><span class="brand">STIR</span>: Steerability-Informed Replanning for <span class="nowrap-line">Reactive Goal Switching</span></h1>
+    <p class="claim">When the commanded goal changes mid-execution, simply re-querying the policy can leave the robot committed to the previous goal. STIR replans <em>where</em> to resume execution.</p>
+    <p class="authors">Anonymous Authors</p>
+    <nav class="links">
+      <a class="btn disabled" aria-disabled="true" title="Available after the review period">Paper (under review)</a>
+      <a class="btn" href="#results">Results</a>
+      <a class="btn" href="https://github.com/stir-replanning/stir-collect-sim"
+         target="_blank" rel="noopener">Collection code</a>
+      <a class="btn" href="https://github.com/stir-replanning/stir-run-sim"
+         target="_blank" rel="noopener">Run code</a>
+      <a class="btn" href="https://huggingface.co/stir-replanning/stir-libero-policies"
+         target="_blank" rel="noopener">Weights</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+
+  <section class="wrap teaser">
+    <div class="teaser-slot" id="teaser">
+      <p class="placeholder">Overview video</p>
+    </div>
+    <p class="teaser-cap" id="teaser-cap" hidden></p>
+  </section>
+
+  <section class="wrap" id="problem">
+    <h2>The problem</h2>
+    <p>When the commanded goal changes mid-execution, the robot has to redirect from an intermediate state it reached while pursuing the previous goal. Those states are not where demonstrations usually start, so re-querying the policy from one of them often leaves the arm committed to the old goal — it continues toward the old object, old destination, or an already-initiated drawer-opening behavior.</p>
+    <p>With the command held fixed, these policies succeed across all tested start positions. Performance degrades when the goal is changed mid-execution.</p>
+  </section>
+
+  <section class="wrap" id="method">
+    <h2>How STIR works</h2>
+    <ol class="method">
+      <li><b>Grid-based intermediate-state collection.</b> Demonstrations toward each goal start from a spatial grid of intermediate positions across the workspace, rather than from a single initial configuration.</li>
+      <li><b>Steerability Score Map.</b> We compute goal-conditioned demonstration density (GDD) over the workspace and use it as a spatial indicator of how well each position supports continuation toward a given goal.</li>
+      <li><b>Replanning at the switch.</b> When the goal changes, STIR selects a nearby higher-scoring resume state, relocates the arm there, and re-queries the policy under the updated goal.</li>
+    </ol>
+    <p class="basenote">All variants fine-tune the same base policy (&pi;<sub>0.5</sub>) with the same procedure. We denote the fixed-initial-state and grid-based intermediate-state fine-tuned policies &pi;<sub>fixed</sub> and &pi;<sub>grid</sub>, respectively. Results then compare direct execution with STIR replanning after a goal switch.</p>
+
+    <h3 class="sub">Where demonstrations start</h3>
+    <p>Step 1 determines how broadly the demonstrations cover potential resume states. Collecting from a single initial configuration provides limited coverage of these states, whereas grid-based intermediate-state collection broadens coverage of intermediate states that may be encountered after a goal switch. In the panels below, blue and orange trajectories are demonstrations toward goal&nbsp;A and goal&nbsp;B, and each marked position in the grid-based panel seeds its own demonstration toward both.</p>
+    <div class="figpair">
+      <figure>
+        <img src="static/images/fig_fixed_start.png" alt="Demonstrations toward two goals, all beginning at one fixed initial configuration.">
+        <figcaption>Fixed-initial-state collection</figcaption>
+      </figure>
+      <figure>
+        <img src="static/images/fig_grid_start.png" alt="Demonstrations toward two goals, beginning from a grid of start positions spanning the workspace.">
+        <figcaption>Grid-based intermediate-state collection</figcaption>
+      </figure>
+    </div>
+
+    <details class="detail">
+      <summary>Coverage across LIBERO-GOAL</summary>
+      <div class="detail-body">
+        <p>The panels above use two goals for legibility. The simulation study runs on LIBERO-GOAL, whose ten tasks share one scene and differ only in the commanded goal, and the contrast carries over: fixed-initial-state collection leaves the demonstrations concentrated along a few routes, while grid-based intermediate-state collection distributes their start states across the workspace. Demonstrations are collected from 121 start nodes per task at 80&nbsp;mm spacing; the panels show a subset for legibility.</p>
+        <div class="figpair">
+          <figure>
+            <img src="static/images/fig_starts_libero_scene.png" alt="Collected start nodes shown in the scene of one LIBERO-GOAL task.">
+            <figcaption>Collected start nodes, in the scene of one task</figcaption>
+          </figure>
+          <figure>
+            <img src="static/images/fig_starts_libero_lattice.png" alt="The collection lattice of start offsets from each task's home pose, at 80 mm spacing.">
+            <figcaption>The same nodes as offsets from the home pose</figcaption>
+          </figure>
+        </div>
+        <figure class="wide-fig">
+          <img src="static/images/fig_sim_coverage.png" alt="Demonstration trajectories for the ten LIBERO-GOAL tasks under three collection schemes, with start positions marked.">
+          <figcaption>Left to right: fixed-initial-state, grid-based, and a sparser 50-node grid. Colors are the ten tasks; circles mark start positions.</figcaption>
+        </figure>
+      </div>
+    </details>
+    <details class="detail">
+      <summary>Switch success on LIBERO-GOAL</summary>
+      <div class="detail-body">
+        <p>Grid-based intermediate-state collection helps across every policy backbone tested, and the gap widens the later the switch arrives: early switches are recoverable either way, while middle and late ones are where fixed-initial-state collection runs out of support.</p>
+        <div class="ptable-scroll">
+          <table class="ptable ptable-8col">
+            <colgroup><col class="c-name"><col class="c-traj"><col class="c-nosw"><col><col><col><col class="c-wide"><col class="c-cmi"></colgroup>
+            <caption>Collection scheme and goal switching. Early, middle and late switching correspond to 0&ndash;1.5&nbsp;s, 1.75&ndash;3.25&nbsp;s and 3.5&ndash;5&nbsp;s; CMI is the state-conditional estimate used by ReSteer.</caption>
+            <thead>
+              <tr>
+                <th rowspan="2">Scheme</th><th rowspan="2">Traj.</th><th rowspan="2">No<br>switch</th>
+                <th colspan="4" class="grouphead">Switch success rate</th><th rowspan="2">CMI</th>
+              </tr>
+              <tr><th class="sub">Early</th><th class="sub">Middle</th><th class="sub">Late</th><th class="key">Overall</th></tr>
+            </thead>
+            <tbody>
+            <tr class="grp"><th colspan="8">Diffusion Policy</th></tr>
+            <tr><th>Fixed-init</th><td>500</td><td>0.928</td><td class="sub">0.333</td><td class="sub">0.100</td><td class="sub">0.050</td><td class="key" style="--v:16.1%">0.161</td><td>1.835</td></tr>
+            <tr><th>Grid-based</th><td>1210</td><td>0.991</td><td class="sub">0.648</td><td class="sub">0.219</td><td class="sub">0.202</td><td class="key" style="--v:35.6%">0.356</td><td>1.329</td></tr>
+            <tr><th>Grid-based</th><td>500</td><td>0.976</td><td class="sub">0.585</td><td class="sub">0.174</td><td class="sub">0.136</td><td class="key" style="--v:29.8%">0.298</td><td>1.632</td></tr>
+            <tr class="grp"><th colspan="8">&pi;<sub>0.5</sub> (full fine-tuning)</th></tr>
+            <tr><th>Fixed-init</th><td>500</td><td>0.973</td><td class="sub">0.593</td><td class="sub">0.175</td><td class="sub">0.201</td><td class="key" style="--v:32.3%">0.323</td><td>1.781</td></tr>
+            <tr><th>Grid-based</th><td>1210</td><td>0.976</td><td class="sub">0.737</td><td class="sub">0.335</td><td class="sub">0.359</td><td class="key" style="--v:47.7%">0.477</td><td>1.657</td></tr>
+            <tr><th>Grid-based</th><td>500</td><td>0.991</td><td class="sub">0.749</td><td class="sub">0.312</td><td class="sub">0.317</td><td class="key" style="--v:46.0%">0.460</td><td>1.845</td></tr>
+            <tr class="grp"><th colspan="8">&pi;<sub>0.5</sub> (LoRA)</th></tr>
+            <tr><th>Fixed-init</th><td>500</td><td>0.980</td><td class="sub">0.607</td><td class="sub">0.175</td><td class="sub">0.182</td><td class="key" style="--v:32.1%">0.321</td><td>1.736</td></tr>
+            <tr><th>Grid-based</th><td>1210</td><td>0.986</td><td class="sub">0.733</td><td class="sub">0.314</td><td class="sub">0.328</td><td class="key" style="--v:45.8%">0.458</td><td>1.529</td></tr>
+            <tr><th>Grid-based</th><td>500</td><td>0.980</td><td class="sub">0.731</td><td class="sub">0.298</td><td class="sub">0.293</td><td class="key" style="--v:44.1%">0.441</td><td>1.736</td></tr>
+            <tr class="grp"><th colspan="8">OpenVLA</th></tr>
+            <tr><th>Fixed-init</th><td>428</td><td>0.725</td><td class="sub">0.356</td><td class="sub">0.110</td><td class="sub">0.050</td><td class="key" style="--v:17.2%">0.172</td><td>0.991</td></tr>
+            <tr><th>Grid-based</th><td>1210</td><td>0.918</td><td class="sub">0.617</td><td class="sub">0.202</td><td class="sub">0.194</td><td class="key" style="--v:33.7%">0.337</td><td>1.061</td></tr>
+            <tr><th>Grid-based</th><td>500</td><td>0.910</td><td class="sub">0.584</td><td class="sub">0.166</td><td class="sub">0.121</td><td class="key" style="--v:29.0%">0.290</td><td>1.209</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </details>
+
+    <h3 class="sub">Where to resume</h3>
+    <p>Step 3 requires selecting a resume state. Below, four selection rules are compared in simulation from the same switch state; the dashed circle is the relocation radius and the number on a candidate is its GDD under the updated goal.</p>
+    <div class="reel reel-sq">
+      <figure class="reel-item">
+        <figcaption>Resume in place</figcaption>
+        <video controls preload="metadata" playsinline muted loop src="static/videos/rule_1_stay.mp4"></video>
+      </figure>
+      <figure class="reel-item">
+        <figcaption>Local lowest-GDD</figcaption>
+        <video controls preload="metadata" playsinline muted loop src="static/videos/rule_2_cmin.mp4"></video>
+      </figure>
+      <figure class="reel-item">
+        <figcaption>Global highest-GDD</figcaption>
+        <video controls preload="metadata" playsinline muted loop src="static/videos/rule_3_amax.mp4"></video>
+      </figure>
+      <figure class="reel-item is-ours">
+        <figcaption>Local highest-GDD <span class="tag">Ours</span></figcaption>
+        <video controls preload="metadata" playsinline muted loop src="static/videos/rule_4_cinf.mp4"></video>
+      </figure>
+    </div>
+    <details class="detail">
+      <summary>Replanning schemes on LIBERO-GOAL</summary>
+      <div class="detail-body">
+        <p>The four clips above are four of these rows. Relocating at random already beats resuming in place, and moving toward the lowest-scoring neighbor is worse than not moving at all &mdash; the gain comes from where the arm goes, not from the fact that it moves.</p>
+        <div class="ptable-scroll">
+          <table class="ptable ptable-2col">
+            <colgroup><col class="c-name"><col></colgroup>
+            <caption>Online evaluation of replanning schemes, at a fixed switching time of 2.5&nbsp;s.</caption>
+            <thead><tr><th>Replanning scheme</th><th>Switch success</th></tr></thead>
+            <tbody>
+              <tr><th>&pi;<sub>fixed</sub>, resume in place</th><td>0.237</td></tr>
+              <tr><th>&pi;<sub>grid</sub>, resume in place</th><td>0.412</td></tr>
+              <tr class="rule"><th>&pi;<sub>grid</sub> + random relocation</th><td>0.457</td></tr>
+              <tr><th>&pi;<sub>grid</sub> + local lowest-GDD</th><td>0.369</td></tr>
+              <tr><th>&pi;<sub>grid</sub> + global highest-GDD</th><td>0.426</td></tr>
+              <tr class="is-ours"><th>&pi;<sub>grid</sub> + local highest-GDD (ours)</th><td>0.534</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </details>
+
+
+  </section>
+
+  <section class="band" id="results">
+    <div class="wrap">
+      <h2>Results</h2>
+      <p class="lead">Switch success rates in two real-robot environments. Dashed lines show the corresponding fixed-goal success rates, where the commanded goal is not changed during execution.</p>
+      <div id="headline"></div>
+      <p class="fineprint" id="headline-note"></p>
+    </div>
+  </section>
+
+  <section class="wrap" id="mechanism">
+    <h2>Failure analysis</h2>
+    <p>Each bar is every switch episode for one configuration, split by outcome. Old-goal commitment&mdash;continuing the behavior associated with the pre-switch goal&mdash;is the failure mode replanning targets, and it is the block that collapses. What the success rate gains, that block loses.</p>
+    <div id="mechanism-figure"></div>
+    <p class="fineprint" id="mechanism-note"></p>
+  </section>
+
+  <section class="wrap" id="timing" hidden>
+    <h2>Switch timing</h2>
+    <p>Success as a function of how far into execution the command changes.</p>
+    <div id="timing-chart"></div>
+  </section>
+
+  <section class="wrap" id="real1">
+    <h2>Real 1 — three-cube pick-and-place</h2>
+    <p>Three cubes sit on a table and the robot carries the commanded one to a tabletop goal region. We evaluate three predefined goal switches (red&nbsp;→&nbsp;blue, blue&nbsp;→&nbsp;black, black&nbsp;→&nbsp;red) from seven start positions: the home position and its six axis-aligned neighbors.</p>
+    <div class="pairs">
+      <section class="pair">
+        <h4>Direct execution, two collection schemes</h4>
+        <div class="reel">
+          <figure class="reel-item">
+            <figcaption>&pi;<sub>fixed</sub> + direct <span>fails</span></figcaption>
+            <video controls preload="metadata" playsinline muted loop src="static/videos/real1_home.mp4"></video>
+          </figure>
+          <figure class="reel-item">
+            <figcaption>&pi;<sub>grid</sub> + direct <span>succeeds</span></figcaption>
+            <video controls preload="metadata" playsinline muted loop src="static/videos/real1_grid_success.mp4"></video>
+          </figure>
+        </div>
+      </section>
+      <section class="pair">
+        <h4>Grid-based data, with and without replanning</h4>
+        <div class="reel">
+          <figure class="reel-item">
+            <figcaption>&pi;<sub>grid</sub> + direct <span>fails</span></figcaption>
+            <video controls preload="metadata" playsinline muted loop src="static/videos/real1_grid_fail.mp4"></video>
+          </figure>
+          <figure class="reel-item is-ours">
+            <figcaption>&pi;<sub>grid</sub> + STIR <span>succeeds</span></figcaption>
+            <video controls preload="metadata" playsinline muted loop src="static/videos/real1_stir.mp4"></video>
+          </figure>
+        </div>
+      </section>
+    </div>
+    <p>Grid-based intermediate-state fine-tuning alone does not eliminate state-dependent switching failures: the same policy can succeed from one resume state and fail from another. STIR addresses this variation by relocating to a nearby state with higher GDD under the updated goal.</p>
+    <details class="detail">
+      <summary>Start positions</summary>
+      <div class="detail-body">
+        <p>Demonstrations are collected on a 45-node grid at 8&nbsp;cm spacing, shown in gray. Evaluation uses the seven marked in blue: the home position and its six axis-aligned neighbors.</p>
+        <figure class="startfig">
+          <img src="static/images/fig_starts_real1.png" alt="Evaluation start positions for Real 1: the home position and its six axis-aligned neighbors, within the grid of collected start nodes.">
+        </figure>
+      </div>
+    </details>
+    <details class="detail">
+      <summary>Language instructions</summary>
+      <div class="detail-body">
+        <ul class="instr">
+          <li>Pick red cube and place on the black square</li>
+          <li>Pick blue cube and place on the black square</li>
+          <li>Pick black cube and place on the black square</li>
+        </ul>
+      </div>
+    </details>
+    <div id="r1-detail"></div>
+  </section>
+
+  <section class="wrap" id="real2">
+    <h2>Real 2 — object&ndash;destination manipulation</h2>
+    <p>Two objects (tape and scissors) are paired with two target destinations (a tabletop goal region and a drawer), yielding four object&ndash;destination tasks. A goal switch can change the destination, the object, or both, and drawer tasks require opening the drawer before placing. Each switch case is evaluated once from each of seven start positions.</p>
+    <details class="detail">
+      <summary>Start positions</summary>
+      <div class="detail-body">
+        <p>Same protocol as Real&nbsp;1: a 45-node grid at 8&nbsp;cm spacing shown in gray, evaluated from the seven marked in blue.</p>
+        <figure class="startfig">
+          <img src="static/images/fig_starts_real2.png" alt="Evaluation start positions for Real 2: the home position and its six axis-aligned neighbors, within the grid of collected start nodes.">
+        </figure>
+      </div>
+    </details>
+    <details class="detail">
+      <summary>Language instructions</summary>
+      <div class="detail-body">
+        <ul class="instr">
+          <li>Pick the scissors and place on the black square</li>
+          <li>Pick the tape and place on the black square</li>
+          <li>Open the upper drawer and place the scissors inside</li>
+          <li>Open the upper drawer and place the tape inside</li>
+        </ul>
+      </div>
+    </details>
+    <div id="r2-detail"></div>
+  </section>
+
+  <section class="wrap" id="data-collection">
+    <h2>Data collection</h2>
+    <p>Demonstrations are collected through VR teleoperation. The operator sees the scene through the headset's passthrough view, together with the two policy camera feeds, and controls the robot using the VR hand controllers. Start positions are sampled across a grid rather than repeated from the home position.</p>
+    <div class="clips">
+      <figure class="clip">
+        <figcaption>External view</figcaption>
+        <video controls preload="metadata" playsinline
+               poster="static/videos/vr_setup_poster.jpg"
+               src="static/videos/vr_setup.mp4"></video>
+      </figure>
+      <figure class="clip">
+        <figcaption>Headset view</figcaption>
+        <video controls preload="metadata" playsinline
+               poster="static/videos/vr_teleop_poster.jpg"
+               src="static/videos/vr_teleop.mp4"></video>
+      </figure>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <p>This project page accompanies an anonymous submission. Author-identifying information has been withheld for double-blind review.</p>
+  </div>
+</footer>
+
+<script defer src="static/js/results.js"></script>
+<script defer src="static/js/results-real1.js"></script>
+<script defer src="static/js/video-manifest.js"></script>
+<script defer src="static/js/results-view.js"></script>
+</body>
+</html>

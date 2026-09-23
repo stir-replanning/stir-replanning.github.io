@@ -1,0 +1,11 @@
+.DS_Store
+_videos_web/
+# local diagnostics — never publish
+/cl.html
+/diag*.html
+/d[0-9].html
+/seektest.html
+/tip.html
+/h.html
+/_*.html
+.vscode/
